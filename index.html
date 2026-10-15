@@ -1334,7 +1334,66 @@ document.addEventListener('mouseup', (e) => {
         e.preventDefault();
       }
     }, { passive: false });
+    // --- VR Controller / Gamepad input ---
+  const gamepadState = {
+    pressed: new Set()
+  };
 
+  function triggerVideoAction(direction) {
+    if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
+
+    if (direction === "next") {
+      handleSwipe(-100); // next / scroll down
+    } else if (direction === "prev") {
+      handleSwipe(100); // previous / scroll up
+    }
+  }
+
+  function pollGamepads() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const pad of pads) {
+      if (!pad) continue;
+
+      // Right controller mapping:
+      // 0 = A, 1 = B, 2 = X, 3 = Y
+      const A = pad.buttons[0];
+      const B = pad.buttons[1];
+      const X = pad.buttons[2];
+      const Y = pad.buttons[3];
+
+      if (A && A.pressed && !gamepadState.pressed.has(`${pad.index}-A`)) {
+        triggerVideoAction("next");
+        gamepadState.pressed.add(`${pad.index}-A`);
+      } else if (!A || !A.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-A`);
+      }
+
+      if (B && B.pressed && !gamepadState.pressed.has(`${pad.index}-B`)) {
+        triggerVideoAction("prev");
+        gamepadState.pressed.add(`${pad.index}-B`);
+      } else if (!B || !B.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-B`);
+      }
+
+      // Optional left controller support
+      if (X && X.pressed && !gamepadState.pressed.has(`${pad.index}-X`)) {
+        triggerVideoAction("next");
+        gamepadState.pressed.add(`${pad.index}-X`);
+      } else if (!X || !X.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-X`);
+      }
+
+      if (Y && Y.pressed && !gamepadState.pressed.has(`${pad.index}-Y`)) {
+        triggerVideoAction("prev");
+        gamepadState.pressed.add(`${pad.index}-Y`);
+      } else if (!Y || !Y.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-Y`);
+      }
+    }
+
+    requestAnimationFrame(pollGamepads);
+  }
+  requestAnimationFrame(pollGamepads);
     // Keyboard events for up/down arrow keys
     document.addEventListener('keydown', (e) => {
       if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
@@ -1538,7 +1597,100 @@ function handleSwipe(deltaY) {
         }
       }
     }
+// --- WebXR native controller input for Quest ---
+function triggerVideoAction(direction) {
+  if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
 
+  if (direction === "next") {
+    handleSwipe(-100);   // next video
+  } else if (direction === "prev") {
+    handleSwipe(100);    // previous video
+  }
+}
+
+function bindXRControllerInput() {
+  if (!("xr" in navigator)) {
+    console.warn("WebXR is not supported in this browser.");
+    return;
+  }
+
+  // Try to start an immersive VR session
+  navigator.xr.requestSession("immersive-vr", {
+    requiredFeatures: ["local-floor"],
+    optionalFeatures: ["hand-tracking"]
+  })
+  .then((session) => {
+    console.log("WebXR VR session started");
+
+    // Trigger / primary action from controller
+    session.addEventListener("selectstart", (event) => {
+      const source = event.inputSource;
+      const gamepad = source?.gamepad;
+
+      if (!gamepad) return;
+
+      // Some controllers expose button layout:
+      // 0 = A / trigger-like primary button
+      // 1 = B / secondary button
+      // 2 = X
+      // 3 = Y
+      const primary = gamepad.buttons[0];
+      const secondary = gamepad.buttons[1];
+      const xButton = gamepad.buttons[2];
+      const yButton = gamepad.buttons[3];
+
+      if (primary && primary.pressed) {
+        triggerVideoAction("next");
+      }
+      if (secondary && secondary.pressed) {
+        triggerVideoAction("prev");
+      }
+      if (xButton && xButton.pressed) {
+        triggerVideoAction("next");
+      }
+      if (yButton && yButton.pressed) {
+        triggerVideoAction("prev");
+      }
+    });
+
+    // Optional: allow on select as well
+    session.addEventListener("select", (event) => {
+      const source = event.inputSource;
+      const gamepad = source?.gamepad;
+
+      if (!gamepad) return;
+
+      const primary = gamepad.buttons[0];
+      const secondary = gamepad.buttons[1];
+      const xButton = gamepad.buttons[2];
+      const yButton = gamepad.buttons[3];
+
+      if (primary && primary.pressed) {
+        triggerVideoAction("next");
+      }
+      if (secondary && secondary.pressed) {
+        triggerVideoAction("prev");
+      }
+      if (xButton && xButton.pressed) {
+        triggerVideoAction("next");
+      }
+      if (yButton && yButton.pressed) {
+        triggerVideoAction("prev");
+      }
+    });
+
+    window.__xrSession = session;
+
+    // If you also want to keep browser fallback for desktop:
+    // keep the existing ArrowDown/ArrowUp keyboard support.
+  })
+  .catch((err) => {
+    console.warn("WebXR session failed:", err);
+  });
+}
+
+// call it once after page setup
+bindXRControllerInput();
 // Log play time when user leaves the page or finish page is shown
 window.addEventListener('beforeunload', () => {
   logPlayTime(currentIndex);
