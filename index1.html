@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <title>Swipe Delay Evaluation</title>
+  <!--<style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      width: 100vw;
+      height: 100dvh; /* ← ここを修正 */
+      overflow: hidden;
+    }
+    #shorts-container {
+      height: 100dvh; /* ← ここも修正 */
+      width: calc(100dvh * 9 / 16); /* 16:9 aspect ratio: calc(100dvh * 9 / 16)*/
+      max-width: 100vw;
+      max-height: 100dvh;
+      overflow: hidden;
+      border-radius: 16px;
+      position: fixed;
+      background: #000;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 32px rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .short, video {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      border: none;
+      top: 0;
+      left: 0;
+      transition: transform 0.4s ease;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000;
+      object-fit: cover;
+      display: block;
+    }
+    /* html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #shorts-container {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      border-radius: 16px;
+      position: fixed;
+      background: #000;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 32px rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .short {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: transform 0.4s ease;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000;
+      display: block;
+    }  */
+  </style>-->
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      touch-action: none; /* Prevents default browser scrolling on mobile */
+    }
+
+    /* --- Main Video Container --- */
+    #shorts-container {
+      /* Default PC Style: 9:16 aspect ratio centered */
+      height: 100dvh;
+      width: calc(100dvh * 9 / 16); 
+      max-width: 100vw;
+      overflow: hidden;
+      position: fixed;
+      background: #000;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 32px rgba(0,0,0,0.5);
+      z-index: 9999;
+      border-radius: 16px;
+    }
+
+    /* --- Smartphone / Mobile Optimization --- */
+    @media (max-width: 768px) {
+      #shorts-container {
+        width: 100%;       /* Force full width on mobile */
+        height: 100%;      /* Force full height */
+        max-width: none;
+        border-radius: 0;  /* Remove rounded corners on mobile */
+        box-shadow: none;
+      }
+    }
+
+    /* --- Video Items --- */
+    .short {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: transform 0.4s ease;
+      z-index: 1; /* Videos are at level 1 */
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* --- Swipe Popup (New Styling) --- */
+    #swipe-popup {
+      display: none; /* Hidden by default, toggled by JS */
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%); /* Centers it perfectly */
+      z-index: 30000; /* Sits on TOP of the videos */
+      pointer-events: none; /* Allows user to swipe THROUGH the popup */
+      width: 100%;
+      height: 100%;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4); /* Optional: darkens background slightly */
+    }
+
+    .popup-content {
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px 40px;
+      border-radius: 50px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      text-align: center;
+      pointer-events: auto;
+    }
+    
+    .popup-content b {
+      color: #ff0000;
+      font-size: 1.5rem;
+      text-transform: uppercase;
+    }
+  </style> 
+</head>
+<body>
+  <!-- Popup for swipe instruction (moved outside start page) -->
+  <!-- <div id="swipe-popup" style="display:none;position:absolute;top:50%;left:calc(50% + 50dvh * 9 / 16 + 32px);transform:translateY(-50%);min-width:180px;z-index:30000;pointer-events:none;">
+    <div style="background:#fff;padding:24px 32px;border-radius:16px;box-shadow:0 0 24px #000;color:#222;font-size:1.5rem;text-align:left;max-width:320px;pointer-events:auto;">
+      <b style="color:red;">scroll down</b>
+    </div>
+  </div> -->
+  <div id="start-page" style="position:fixed;inset:0;width:100vw;height:100dvh;background:#000;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:10000;overflow:auto;">
+    <h1 style="color:#fff;margin-bottom:32px;">Main Evaluation</h1>
+    <!-- ★ 追加テキストここから -->
+    <div style="color:#fff;font-size:1.1rem;max-width:90vw;margin-bottom:32px;line-height:1.7;text-align:left;">
+      Please input your name, age, and experience with short video services.<br>
+      Then, click the "START" button to start the main evaluation.<br>
+      <br>
+      <!-- After the evaluation, please download the log file, then upload the log file to the following url:<br>
+        // Show swipe popup after 10s
+        clearTimeout(window._swipePopupTimeout);
+        document.getElementById('swipe-popup').style.display = 'none';        
+        window._swipePopupTimeout = setTimeout(() => {
+          // Only show popup if start page is still hidden
+          if (startPage.style.display === "none") {
+            document.getElementById('swipe-popup').style.display = 'flex';
+          }
+        }, 10000);
+      } else {
+        // Always hide popup if start page is visible
+        clearTimeout(window._swipePopupTimeout);
+        document.getElementById('swipe-popup').style.display = 'none';
+      <a href="https://drive.google.com/drive/folders/1gcJidjtfxKTOjakc0fy3BrnshTZIS3BV?usp=sharing" target="_blank" style="color:#4af;text-decoration:underline;">
+        https://drive.google.com/drive/folders/1gcJidjtfxKTOjakc0fy3BrnshTZIS3BV?usp=sharing
+      </a> -->
+      <!-- (Upload URL will be provided after the experiment) -->
+      <br>
+    </div>
+    <!-- ★ 追加テキストここまで -->
+    <label style="color:#fff;font-size:1.2rem;margin-bottom:8px;" for="name-input">Your Name:</label>
+    <input id="name-input" type="text" required style="font-size:1.2rem;padding:8px 12px;border-radius:8px;border:none;margin-bottom:20px;width:200px;">
+        
+    <label style="color:#fff;font-size:1.2rem;margin-bottom:8px;" for="age-input">Your Age:</label>
+    <input id="age-input" type="number" min="1" max="120" required style="font-size:1.2rem;padding:8px 12px;border-radius:8px;border:none;margin-bottom:20px;width:200px;">
+    <label style="color:#fff;font-size:1.2rem;margin-bottom:8px;" for="exp-input">Experience with short video services (years):</label>
+    <input id="exp-input" type="number" min="0" max="50" step="0.1" required style="font-size:1.2rem;padding:8px 12px;border-radius:8px;border:none;margin-bottom:32px;width:200px;">
+    <label style="color:#fff;font-size:1.2rem;margin-bottom:8px;" for="device-input">Device name:</label>
+    <input id="device-input" type="text" required style="font-size:1.2rem;padding:8px 12px;border-radius:8px;border:none;margin-bottom:32px;width:200px;">
+    <button id="start-btn" style="font-size:2rem;padding:16px 48px;border-radius:12px;border:none;background:#ff0000;color:#fff;cursor:pointer;">Start</button>
+  </div>
+  <div id="shorts-container" style="display:none;">
+    <div id="swipe-popup" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30000;pointer-events:none;width:100%;height:100%;justify-content:center;align-items:center;background:rgba(0,0,0,0.4);">
+      <div class="popup-content">
+        <b>scroll down</b>
+      </div>
+    </div>
+  </div>
+  <div id="finish-page" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:20001;flex-direction:column;justify-content:center;align-items:center;">
+    <h1 style="color:#fff;margin-bottom:32px;">Thank you for participating!</h1>
+    <p style="color:#fff;font-size:1.2rem;margin-bottom:32px;">You have finished watching all videos.</p>
+    <button id="download-log-btn-finish" style="font-size:1.2rem;padding:12px 32px;border-radius:8px;border:none;background:#222;color:#fff;cursor:pointer;">Download Log</button>
+    <div style="margin-top:32px;color:#fff;font-size:1.1rem;text-align:center;">
+      Please upload your downloaded log file to:<br>
+      <a href="https://drive.google.com/drive/folders/1-eO-y5bfWuiZvojqYlE-Lh4KqgXEvAbs?usp=sharing" target="_blank" style="color:#4af;text-decoration:underline;">
+        https://drive.google.com/drive/folders/1-eO-y5bfWuiZvojqYlE-Lh4KqgXEvAbs?usp=sharing
+      </a>
+    </div>
+  </div>
+  <!-- Rest period screen -->
+  <div id="rest-page" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:30000;flex-direction:column;justify-content:center;align-items:center;">
+    <h1 style="color:#fff;margin-bottom:32px;">Rest Period</h1>
+    <p style="color:#fff;font-size:1.5rem;">Please take a 3-minute break.<br>After the break, press the resume button below to continue.</p>
+    <div id="rest-timer" style="color:#fff;font-size:2rem;margin-top:24px;"></div>
+    <button id="resume-btn" style="display:none;margin-top:32px;font-size:1.5rem;padding:16px 48px;border-radius:12px;border:none;background:#ff0000;color:#fff;cursor:pointer;">Resume</button>
+  </div>
+  <!-- ★ 評価ページを追加 -->
+<div id="score-page" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;z-index:20002;flex-direction:column;justify-content:center;align-items:center;">
+  <h1 style="color:#fff;margin-bottom:32px;text-align:center;">Voting</h1>
+
+        
+  <!-- ★ 進捗バー追加 -->
+  <div id="progress-bar-container" style="width:60vw;max-width:400px;height:24px;background:#222;border-radius:12px;overflow:hidden;margin-bottom:8px;">
+    <div id="progress-bar" style="height:100%;width:0%;background:#ff0000;transition:width 0.4s;"></div>
+  </div>
+  <!-- ★ 進捗テキスト追加 -->
+  <div id="progress-text" style="color:#fff;font-size:1.1rem;margin-bottom:16px;text-align:center;">
+  </div>
+  <p style="color:#fff;font-size:1.2rem;margin-bottom:24px;text-align:center;">
+  Please rate the last test sample:
+  </p>
+  <form id="score-form" style="color:#fff;font-size:1.2rem;display:flex;flex-direction:column;align-items:center;">
+    <label><input type="radio" name="acr" value="5" required> 5: Excellent </label>
+    <label><input type="radio" name="acr" value="4"> 4: Good</label>
+    <label><input type="radio" name="acr" value="3"> 3: Fair</label>
+    <label><input type="radio" name="acr" value="2"> 2: Poor</label>
+    <label><input type="radio" name="acr" value="1"> 1: Bad</label>
+    <button id="next-btn"  type="submit" style="margin-top:24px;font-size:1.2rem;padding:12px 32px;border-radius:8px;border:none;background:#ce0909;color:#fff;cursor:pointer;">Next Test</button>
+  </form>
+</div>
+
+  <script>
+    // --- Logging utility ---
+
+    // --- Rest period logic (moved here for scope) ---
+    function showRestPage(callback) {
+      const restPage = document.getElementById('rest-page');
+      const resumeBtn = document.getElementById('resume-btn');
+      restPage.style.display = 'flex';
+      resumeBtn.style.display = 'none';
+      let seconds = 60*3;
+      const timerDiv = document.getElementById('rest-timer');
+      timerDiv.textContent = `Time left: ${seconds}s`;
+      const interval = setInterval(() => {
+        seconds--;
+        timerDiv.textContent = `Time left: ${seconds}s`;
+        if (seconds <= 0) {
+          clearInterval(interval);
+          resumeBtn.style.display = 'block';
+          resumeBtn.onclick = function() {
+            restPage.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            if (callback) callback();
+          };
+        }
+      }, 1000);
+    }
+    const logBuffer = [];
+    function logAndBuffer(...args) {
+      logBuffer.push(args.map(String).join(' '));
+      console.log(...args);
+    }
+
+    let swipeLocked = false;
+
+    // --- Start page logic ---
+    const startPage = document.getElementById('start-page');
+    const shortsContainer = document.querySelectorAll('#shorts-container')[1] || document.getElementById('shorts-container');
+    const finishPage = document.getElementById('finish-page');
+    const downloadLogBtnFinish = document.getElementById('download-log-btn-finish');
+    let userName = ""; // Store user name for log file
+
+
+    let evaluationCount = 0;
+    const VIDEO_WATCH_MS = 10000;
+    let currentVideoIndex = 0;
+    let watchTimer = null;
+    let currentVideoItem = null;
+    //phong modify
+    // var video_path = "video_JP/"
+    const RES_PATHS = {
+      "0":  "./video_resolution/720p/",
+      "1":  "./video_resolution/480p/",
+      "2":  "./video_resolution/360p/",
+      "3":  "./video_resolution/240p/",
+      "4":  "./video_resolution/144p/",
+      // "5":  "./video_resolution/120p/",
+      "5":  "./video_resolution/96p/"
+    };
+
+// --- Video file list (replace with your server video URLs) ---
+//     const videoList = [
+//   { title: "Video 1", src: video_path+"1.mp4" },
+//   { title: "Video 2", src: video_path + "2.mp4" },
+//   { title: "Video 3", src: video_path + "3.mp4" },
+//   { title: "Video 4", src: video_path + "4.mp4" },
+//   { title: "Video 5", src: video_path + "5.mp4" },
+//   { title: "Video 6", src: video_path + "6.mp4" },
+//   { title: "Video 7", src: video_path + "7.mp4" },
+//   { title: "Video 8", src: video_path + "8.mp4" },
+//   { title: "Video 9", src: video_path + "9.mp4" },
+//   { title: "Video 10", src: video_path + "10.mp4" },
+//   { title: "Video 11", src: video_path + "11.mp4" },
+//   { title: "Video 12", src: video_path + "12.mp4" },
+//   { title: "Video 13", src: video_path + "13.mp4" },
+//   { title: "Video 14", src: video_path + "14.mp4" },
+//   { title: "Video 15", src: video_path + "15.mp4" },
+//   { title: "Video 16", src: video_path + "16.mp4" },
+//   { title: "Video 17", src: video_path + "17.mp4" },
+//   { title: "Video 18", src: video_path + "18.mp4" },
+//   { title: "Video 19", src: video_path + "19.mp4" },
+//   { title: "Video 20", src: video_path + "20.mp4" },
+//   { title: "Video 21", src: video_path + "21.mp4" },
+//   { title: "Video 22", src: video_path + "22.mp4" },
+//   { title: "Video 23", src: video_path + "23.mp4" },
+//   { title: "Video 24", src: video_path + "24.mp4" },
+//   { title: "Video 25", src: video_path + "25.mp4" },
+//   { title: "Video 26", src: video_path + "26.mp4" },
+//   { title: "Video 27", src: video_path + "27.mp4" },
+//   { title: "Video 28", src: video_path + "28.mp4" },
+//   { title: "Video 29", src: video_path + "29.mp4" },
+//   { title: "Video 30", src: video_path + "30.mp4" },
+//   { title: "Video 31", src: video_path + "31.mp4" },
+//   { title: "Video 32", src: video_path + "32.mp4" },
+//   { title: "Video 33", src: video_path + "33.mp4" },
+//   { title: "Video 34", src: video_path + "34.mp4" },
+//   { title: "Video 35", src: video_path + "35.mp4" },
+//   { title: "Video 36", src: video_path + "36.mp4" },
+//   { title: "Video 37", src: video_path + "37.mp4" },
+//   { title: "Video 38", src: video_path + "38.mp4" },
+//   { title: "Video 39", src: video_path + "39.mp4" },
+//   { title: "Video 40", src: video_path + "40.mp4" },
+//   { title: "Video 41", src: video_path + "41.mp4" },
+//   { title: "Video 42", src: video_path + "42.mp4" },
+//   { title: "Video 43", src: video_path + "43.mp4" },
+//   { title: "Video 44", src: video_path + "44.mp4" },
+//   { title: "Video 45", src: video_path + "45.mp4" },
+//   { title: "Video 46", src: video_path + "46.mp4" },
+//   { title: "Video 47", src: video_path + "47.mp4" },
+//   { title: "Video 48", src: video_path + "48.mp4" },
+//   { title: "Video 49", src: video_path + "49.mp4" },
+//   { title: "Video 50", src: video_path + "50.mp4" },
+//   { title: "Video 51", src: video_path + "51.mp4" },
+//   { title: "Video 52", src: video_path + "52.mp4" },
+//   { title: "Video 53", src: video_path + "53.mp4" },
+//   { title: "Video 54", src: video_path + "54.mp4" },
+//   { title: "Video 55", src: video_path + "55.mp4" },
+//   { title: "Video 56", src: video_path + "56.mp4" },
+//   { title: "Video 57", src: video_path + "57.mp4" },
+//   { title: "Video 58", src: video_path + "58.mp4" },
+//   { title: "Video 59", src: video_path + "59.mp4" },
+//   { title: "Video 60", src: video_path + "60.mp4" },
+//   { title: "Video 61", src: video_path + "61.mp4" },
+//   { title: "Video 62", src: video_path + "62.mp4" },
+//   { title: "Video 63", src: video_path + "63.mp4" },
+//   { title: "Video 64", src: video_path + "64.mp4" },
+//   { title: "Video 65", src: video_path + "65.mp4" },
+//   { title: "Video 66", src: video_path + "66.mp4" },
+//   { title: "Video 67", src: video_path + "67.mp4" },
+//   { title: "Video 68", src: video_path + "68.mp4" },
+//   { title: "Video 69", src: video_path + "69.mp4" },
+//   { title: "Video 70", src: video_path + "70.mp4" },
+//   { title: "Video 71", src: video_path + "71.mp4" },
+//   { title: "Video 72", src: video_path + "72.mp4" },
+//   { title: "Video 73", src: video_path + "73.mp4" },
+//   { title: "Video 74", src: video_path + "74.mp4" },
+//   { title: "Video 75", src: video_path + "75.mp4" },
+//   { title: "Video 76", src: video_path + "76.mp4" },
+//   { title: "Video 77", src: video_path + "77.mp4" },
+//   { title: "Video 78", src: video_path + "78.mp4" },
+//   { title: "Video 79", src: video_path + "79.mp4" },
+//   { title: "Video 80", src: video_path + "80.mp4" },
+//   { title: "Video 81", src: video_path + "81.mp4" },
+//   { title: "Video 82", src: video_path + "82.mp4" },
+//   { title: "Video 83", src: video_path + "83.mp4" },
+//   { title: "Video 84", src: video_path + "84.mp4" },
+//   { title: "Video 85", src: video_path + "85.mp4" },
+//   { title: "Video 86", src: video_path + "86.mp4" },
+//   { title: "Video 87", src: video_path + "87.mp4" },
+//   { title: "Video 88", src: video_path + "88.mp4" },
+//   { title: "Video 89", src: video_path + "89.mp4" },
+//   { title: "Video 90", src: video_path + "90.mp4" },
+//   { title: "Video 91", src: video_path + "91.mp4" },
+//   { title: "Video 92", src: video_path + "92.mp4" },
+//   { title: "Video 93", src: video_path + "93.mp4" },
+//   { title: "Video 94", src: video_path + "94.mp4" },
+//   { title: "Video 95", src: video_path + "95.mp4" },
+//   { title: "Video 96", src: video_path + "96.mp4" },
+//   { title: "Video 97", src: video_path + "97.mp4" },
+//   { title: "Video 98", src: video_path + "98.mp4" },
+//   { title: "Video 99", src: video_path + "99.mp4" },
+//   { title: "Video 100", src: video_path + "100.mp4" },
+//   { title: "Video 101", src: video_path + "101.mp4" },
+//   { title: "Video 102", src: video_path + "102.mp4" },
+//   { title: "Video 103", src: video_path + "103.mp4" },
+//   { title: "Video 104", src: video_path + "104.mp4" },
+//   { title: "Video 105", src: video_path + "105.mp4" },
+//   { title: "Video 106", src: video_path + "106.mp4" },
+//   { title: "Video 107", src: video_path + "107.mp4" },
+//   { title: "Video 108", src: video_path + "108.mp4" },
+//   { title: "Video 109", src: video_path + "109.mp4" },
+//   { title: "Video 110", src: video_path + "110.mp4" },
+//   { title: "Video 111", src: video_path + "111.mp4" },
+//   { title: "Video 112", src: video_path + "112.mp4" },
+//   { title: "Video 113", src: video_path + "113.mp4" },
+//   { title: "Video 114", src: video_path + "114.mp4" },
+//   { title: "Video 115", src: video_path + "115.mp4" },
+//   { title: "Video 116", src: video_path + "116.mp4" },
+//   { title: "Video 117", src: video_path + "117.mp4" },
+//   { title: "Video 118", src: video_path + "118.mp4" },
+//   { title: "Video 119", src: video_path + "119.mp4" },
+//   { title: "Video 120", src: video_path + "120.mp4" },
+//   { title: "Video 121", src: video_path + "121.mp4" },
+//   { title: "Video 122", src: video_path + "122.mp4" },
+//   { title: "Video 123", src: video_path + "123.mp4" },
+//   { title: "Video 124", src: video_path + "124.mp4" },
+//   { title: "Video 125", src: video_path + "125.mp4" },
+//   { title: "Video 126", src: video_path + "126.mp4" },
+//   { title: "Video 127", src: video_path + "127.mp4" },
+//   { title: "Video 128", src: video_path + "128.mp4" },
+//   { title: "Video 129", src: video_path + "129.mp4" },
+//   { title: "Video 130", src: video_path + "130.mp4" },
+//   { title: "Video 131", src: video_path + "131.mp4" },
+//   { title: "Video 132", src: video_path + "132.mp4" },
+//   { title: "Video 133", src: video_path + "133.mp4" },
+//   { title: "Video 134", src: video_path + "134.mp4" },
+//   { title: "Video 135", src: video_path + "135.mp4" },
+//   { title: "Video 136", src: video_path + "136.mp4" },
+//   { title: "Video 137", src: video_path + "137.mp4" },
+//   { title: "Video 138", src: video_path + "138.mp4" },
+//   { title: "Video 139", src: video_path + "139.mp4" },
+//   { title: "Video 140", src: video_path + "140.mp4" },
+//   { title: "Video 141", src: video_path + "141.mp4" },
+//   { title: "Video 142", src: video_path + "142.mp4" },
+//   { title: "Video 143", src: video_path + "143.mp4" },
+//   { title: "Video 144", src: video_path + "144.mp4" },
+//   { title: "Video 145", src: video_path + "145.mp4" },
+//   { title: "Video 146", src: video_path + "146.mp4" },
+//   { title: "Video 147", src: video_path + "147.mp4" },
+//   { title: "Video 148", src: video_path + "148.mp4" },
+//   { title: "Video 149", src: video_path + "149.mp4" },
+//   { title: "Video 150", src: video_path + "150.mp4" },
+//   { title: "Video 151", src: video_path + "151.mp4" },
+//   { title: "Video 152", src: video_path + "152.mp4" },
+//   { title: "Video 153", src: video_path + "153.mp4" },
+//   { title: "Video 154", src: video_path + "154.mp4" },
+//   { title: "Video 155", src: video_path + "155.mp4" },
+//   { title: "Video 156", src: video_path + "156.mp4" },
+//   { title: "Video 157", src: video_path + "157.mp4" },
+//   { title: "Video 158", src: video_path + "158.mp4" },
+//   { title: "Video 159", src: video_path + "159.mp4" },
+//   { title: "Video 160", src: video_path + "160.mp4" },
+//   { title: "Video 161", src: video_path + "161.mp4" },
+//   { title: "Video 162", src: video_path + "162.mp4" },
+//   { title: "Video 163", src: video_path + "163.mp4" },
+//   { title: "Video 164", src: video_path + "164.mp4" },
+//   { title: "Video 165", src: video_path + "165.mp4" },
+//   { title: "Video 166", src: video_path + "166.mp4" },
+//   { title: "Video 167", src: video_path + "167.mp4" },
+//   { title: "Video 168", src: video_path + "168.mp4" },
+//   { title: "Video 169", src: video_path + "169.mp4" },
+//   { title: "Video 170", src: video_path + "170.mp4" },
+//   { title: "Video 171", src: video_path + "171.mp4" },
+//   { title: "Video 172", src: video_path + "172.mp4" },
+//   { title: "Video 173", src: video_path + "173.mp4" },
+//   { title: "Video 174", src: video_path + "174.mp4" },
+//   { title: "Video 175", src: video_path + "175.mp4" },
+//   { title: "Video 176", src: video_path + "176.mp4" },
+//   { title: "Video 177", src: video_path + "177.mp4" },
+//   { title: "Video 178", src: video_path + "178.mp4" },
+//   { title: "Video 179", src: video_path + "179.mp4" },
+//   { title: "Video 180", src: video_path + "180.mp4" },
+//   { title: "Video 181", src: video_path + "181.mp4" },
+//   { title: "Video 182", src: video_path + "182.mp4" },
+//   { title: "Video 183", src: video_path + "183.mp4" },
+//   { title: "Video 184", src: video_path + "184.mp4" },
+//   { title: "Video 185", src: video_path + "185.mp4" },
+//   { title: "Video 186", src: video_path + "186.mp4" },
+//   { title: "Video 187", src: video_path + "187.mp4" },  
+//   { title: "Video 188", src: video_path + "188.mp4" },
+//   { title: "Video 189", src: video_path + "189.mp4" },
+//   { title: "Video 190", src: video_path + "190.mp4" },
+//   { title: "Video 191", src: video_path + "191.mp4" },
+//   { title: "Video 192", src: video_path + "192.mp4" },
+//   { title: "Video 193", src: video_path + "193.mp4" },
+//   { title: "Video 194", src: video_path + "194.mp4" },
+//   { title: "Video 195", src: video_path + "195.mp4" },
+//   { title: "Video 196", src: video_path + "196.mp4" },
+//   { title: "Video 197", src: video_path + "197.mp4" }
+// ];
+
+    // --- 各遅延パターンごとに使う動画インデックスをCSVから読み込む ---
+    let PREDEFINED_VIDEO_INDEXES = [
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    [90,111,114,112,93,154],
+    ];
+
+   let VIDEO_SWITCH_DELAYS = [
+    [0,	0,	0,	0,	0,	0],
+    [0,	0,	0,	2000,	2000,	0],
+    [0,	0,	0,	4000,	4000,	0],
+    [0,	0,	0,	8000,	8000,	0],
+    [2000,	0,	0,	0,	0,	0],
+    [8000,	0,	0,	0,	0,	0],
+    [16000,	0,	0,	0,	0,	0],
+    [0,	0,	0,	0,	0,	0],
+    [0,	0,	0,	0,	4000,	0],
+    [0,	0,	0,	0,	8000,	0],
+    [0,	0,	0,	0,	16000,	0],
+    [4000,	0,	0,	0,	0,	0],
+    [8000,	0,	0,	0,	0,	0],
+    [16000,	0,	0,	0,	0,	0],
+    [0,	0,	0,	0,	0,	0],
+    [0,	0,	0,	0,	4000,	0],
+    [0,	0,	0,	0,	8000,	0],
+    [0,	0,	0,	0,	16000,	0],
+    [4000,	0,	0,	0,	0,	0],
+    [8000,	0,	0,	0,	0,	0],
+    [16000,	0,	0,	0,	0,	0],
+    [0,	0,	0,	0,	0,	0],
+    [0,	0,	0,	0,	4000,	0],
+    [0,	0,	0,	0,	8000,	0],
+    [0,	0,	0,	0,	16000,	0],
+    [4000,	0,	0,	0,	0,	0],
+    [8000,	0,	0,	0,	0,	0],
+    [16000,	0,	0,	0,	0,	0]
+    ];
+    // let VIEW_TIME_MS = [5000,5000,5000,5000,5000,5000,50000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 20000, 20000, 20000, 20000, 20000, 20000, 20000]; // 各動画の視聴時間（ミリ秒）
+    let VIEW_TIME_MS = [2000,2000,2000,2000,2000,2000,2000, 4000, 4000, 4000, 4000, 4000,4000, 4000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 16000, 16000, 16000, 16000, 16000, 16000, 16000]; // 各動画の視聴時間（ミリ秒）
+    
+    // let TEST_SAMPLE = [
+    // [1,[0,	0,	0,	0,	0,	0], 2000],
+    // [2,[1000,	1000,	1000,	1000,	0,	0], 2000],
+    // [3,[0,	1000,	1000,	1000,	1000,	0], 2000],
+    // [4,[2000,	2000,	2000,	2000,	0,	0], 2000],
+    // [5,[0,	2000,	2000,	2000,	2000,	0],2000],
+    // [6,[4000,	4000,	4000,	4000,	0,	0], 2000],
+    // [7,[0,	4000,	4000,	4000,	4000,	0], 2000],
+    // [8,[0,	0,	0,	0,	0,	0], 4000],
+    // [9, [1000,	1000,	1000,	1000,	0,	0], 4000],
+    // [10,[0,	1000,	1000,	1000,	1000,	0], 4000],
+    // [11,[2000,	2000,	2000,	2000,	0,	0], 4000],
+    // [12,[0,	2000,	2000,	2000,	2000,	0],4000],
+    // [13,[4000,	4000,	4000,	4000,	0,	0], 4000],
+    // [14,[0,	4000,	4000,	4000,	4000,	0], 4000],
+    // [15,[0,	0,	0,	0,	0,	0], 8000],
+    // [16,[1000,	1000,	1000,	1000,	0,	0], 8000],
+    // [17,[0,	1000,	1000,	1000,	1000,	0], 8000],
+    // [18,[2000,	2000,	2000,	2000,	0,	0], 8000],
+    // [19,[0,	2000,	2000,	2000,	2000,	0],8000],
+    // [20,[4000,	4000,	4000,	4000,	0,	0], 8000],
+    // [21,[0,	4000,	4000,	4000,	4000,	0], 8000],
+    // [22,[0,	0,	0,	0,	0,	0], 16000],
+    // [23,[1000,	1000,	1000,	1000,	0,	0], 16000],
+    // [24,[0,	1000,	1000,	1000,	1000,	0], 16000],
+    // [25,[2000,	2000,	2000,	2000,	0,	0], 16000],
+    // [26,[0,	2000,	2000,	2000,	2000,	0],16000],
+    // [27,[4000,	4000,	4000,	4000,	0,	0], 16000],
+    // [28,[0,	4000,	4000,	4000,	4000,	0], 16000],
+    // ];
+
+    // [ID, Resolutions, ViewTime, Delays]
+    let TEST_SAMPLE = [
+    [1, ["0", "0", "0", "0", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [2, ["0", "2", "0", "0", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [3, ["0", "0", "0", "0", "0", "2"], 8000, [0, 0, 0, 0, 0, 0]],
+    [4, ["0", "4", "0", "0", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [5, ["0", "0", "0", "0", "0", "4"], 8000, [0, 0, 0, 0, 0, 0]],
+    [6, ["0", "2", "2", "0", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [7, ["0", "0", "0", "0", "2", "2"], 8000, [0, 0, 0, 0, 0, 0]],
+    [8, ["0", "4", "4", "0", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [9, ["0", "0", "0", "0", "4", "4"], 8000, [0, 0, 0, 0, 0, 0]],
+    [10, ["0", "2", "0", "2", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [11, ["0", "0", "0", "2", "0", "2"], 8000, [0, 0, 0, 0, 0, 0]],
+    [12, ["0", "4", "0", "4", "0", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [13, ["0", "0", "0", "4", "0", "4"], 8000, [0, 0, 0, 0, 0, 0]],
+    [14, ["0", "2", "2", "2", "2", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [15, ["0", "0", "2", "2", "2", "2"], 8000, [0, 0, 0, 0, 0, 0]],
+    [16, ["0", "4", "4", "4", "4", "0"], 8000, [0, 0, 0, 0, 0, 0]],
+    [17, ["0", "0", "4", "4", "4", "4"], 8000, [0, 0, 0, 0, 0, 0]],
+    [18, ["0", "2", "2", "0", "2", "2"], 8000, [0, 0, 0, 0, 0, 0]],
+    [19, ["0", "4", "4", "0", "4", "4"], 8000, [0, 0, 0, 0, 0, 0]],
+    [20, ["2", "2", "2", "2", "2", "2"], 8000, [0, 0, 0, 0, 0, 0]],
+    [21, ["4", "4", "4", "4", "4", "4"], 8000, [0, 0, 0, 0, 0, 0]],
+    ];
+
+    let test_id_list = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
+    // get test_id_list from URL parameter "test_ids", e.g., ?test_ids=1,5,6,7
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('test_ids')) {
+      const test_ids_param = urlParams.get('test_ids');
+      test_id_list = test_ids_param.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id >= 1 && id <= TEST_SAMPLE.length);
+    }
+    console.log('Test ID list from URL or default:', test_id_list);
+    let selected_test_samples = TEST_SAMPLE.filter((_, idx) => test_id_list.includes(idx+1));
+    // shuffle selected_test_samples
+    for (let i = selected_test_samples.length - 1; i > 0; i--) {
+     const j = Math.floor(Math.random() * (i + 1));
+     [selected_test_samples[i], selected_test_samples[j]] = [selected_test_samples[j], selected_test_samples[i]];
+    }
+    console.log('Selected test samples:', selected_test_samples);
+
+    const DEFAULT_DELAY = 1000;
+    let delaysLoaded = true;
+    // let EVALUATION_REPEAT = VIDEO_SWITCH_DELAYS.length || 1; // デフォルト値を設定
+    let EVALUATION_REPEAT = selected_test_samples.length ; // デフォルト値を設定
+    console.log('EVALUATION_REPEAT:', EVALUATION_REPEAT);
+
+    function shuffleRowsInSync(arr1, arr2) {
+      const zipped = arr1.map((val, idx) => [val, arr2[idx]]);
+      for (let i = zipped.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [zipped[i], zipped[j]] = [zipped[j], zipped[i]];
+      }
+      // Unzip back
+      for (let i = 0; i < zipped.length; i++) {
+        arr1[i] = zipped[i][0];
+        arr2[i] = zipped[i][1];
+      }
+    }
+    function shuffleRowsInSync2(arr1, arr2, arr3) {
+      array_length = arr1.length;
+      idx_list = [];
+      for (let i = 0; i < array_length; i++) {
+        idx_list.push(i);
+      }
+      /* Shuffle idx_list */
+      for (let i = idx_list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [idx_list[i], idx_list[j]] = [idx_list[j], idx_list[i]];
+      }
+      // Reorder arr1, arr2, arr3 based on shuffled idx_list
+      const arr1_copy = arr1.slice();
+      const arr2_copy = arr2.slice();
+      const arr3_copy = arr3.slice();
+      for (let i = 0; i < array_length; i++) {
+        arr1[i] = arr1_copy[idx_list[i]];
+        arr2[i] = arr2_copy[idx_list[i]];
+        arr3[i] = arr3_copy[idx_list[i]];
+      }
+    }
+    function sum(arr) {
+      return arr.reduce((a, b) => a + b, 0);
+    }
+    // shuffleRowsInSync(PREDEFINED_VIDEO_INDEXES, VIDEO_SWITCH_DELAYS);
+    
+    // select a subset of test samples from TEST_SAMPLE based on pattern_id_list
+
+
+    // shuffleRowsInSync(VIDEO_SWITCH_DELAYS, VIEW_TIME_MS);
+    // console.log('Loaded video switch delays:', VIDEO_SWITCH_DELAYS.length, [VIDEO_SWITCH_DELAYS, VIEW_TIME_MS], PREDEFINED_VIDEO_INDEXES);
+    // total_view_time_ms = sum(VIEW_TIME_MS)*6 + sum(VIDEO_SWITCH_DELAYS.flat());
+    // console.log('Total estimated view time(mins):',sum(VIEW_TIME_MS), total_view_time_ms/1000/60);
+    function waitForAllVideosLoaded(videoList, callback) {
+      let loadedCount = 0;
+      const total = videoList.length;
+      if (total === 0) {
+        callback();
+        return;
+      }
+      videoList.forEach(videoObj => {
+        fetch(videoObj.src)
+          .then(response => {
+            loadedCount++;
+            if (loadedCount === total) callback();
+          })
+          .catch(() => {
+            loadedCount++;
+            if (loadedCount === total) callback();
+          });
+      });
+    }
+    function loadVideosWithFetch(videoObjs, callback) {
+      let loaded = 0;
+      const total = videoObjs.length;
+      const blobs = new Array(total);
+
+      videoObjs.forEach((video, idx) => {
+        fetch(video.src)
+          .then(res => res.blob())
+          .then(blob => {
+            blobs[idx] = URL.createObjectURL(blob);
+            loaded++;
+            console.log(`Video ${idx + 1}/${total} loaded: ${video.src}`);
+            if (loaded === total) callback(blobs);
+          })
+          .catch(() => {
+            console.error(`Error loading video ${idx + 1}/${total}: ${video.src}`);
+            blobs[idx] = video.src; // エラー時は元URL
+            loaded++;
+            if (loaded === total) callback(blobs);
+          });
+      });
+    }
+    
+    
+    const startBtn = document.getElementById('start-btn');
+    let videoQueue = [];
+    startBtn.disabled = false;
+    startBtn.style.opacity = '1';
+    shortsContainer.innerHTML = '';
+
+    document.getElementById('start-btn').onclick = function() {
+      // Always hide popup when showing start page
+      clearTimeout(window._swipePopupTimeout);
+      const swipePopup = document.getElementById('swipe-popup');
+      if (swipePopup) swipePopup.style.display = 'none';
+      
+      // Get name, age, experience, and NEW device values
+      const name = document.getElementById('name-input').value.trim();
+      const age = document.getElementById('age-input').value.trim();
+      const exp = document.getElementById('exp-input').value.trim();
+      const device = document.getElementById('device-input').value.trim(); // ★ NEW
+
+      // Check if any field is empty
+      if (!name || !age || !exp || !device) { // ★ Update check
+        alert('Please input your name, age, experience, and device name before starting.');
+        return;
+      }
+
+      userName = name || "user";
+      logAndBuffer('User Name:', name);
+      logAndBuffer('User Age:', age);
+      logAndBuffer('Experience (years):', exp);
+      logAndBuffer('Device Name:', device); // ★ Log the new data
+      
+      startPage.style.display = 'none';
+      shortsContainer.style.display = '';
+      videoQueue = buildVideoQueue();
+      currentVideoIndex = 0;
+      evaluationCount = 0;
+      updateProgressBar();
+      loadCurrentVideo();
+    };
+
+   
+// phong modify
+function getCurrentDelay() {
+  // currentIndexが範囲外の場合はデフォルト値
+  //return VIDEO_SWITCH_DELAYS[currentIndex] || 1000;
+
+  // ラウンドと動画インデックスで遅延を取得
+  const round = evaluationCount;
+  if (
+    selected_test_samples[round][3] &&
+    typeof selected_test_samples[round][3][currentIndex] === 'number'
+  ) {
+    return selected_test_samples[round][3][currentIndex];
+  }
+  return DEFAULT_DELAY;
+}
+// function getCurrentDelay() {
+//   const round = evaluationCount;
+//   // Check if we have data for this round
+//   if (selected_test_samples[round]) {
+//     // In your TEST_SAMPLE structure: 
+//     // [ID, [Resolutions], Round_View_Time]
+//     // We need to match this against VIDEO_SWITCH_DELAYS using the ID
+//     const testID = selected_test_samples[round][0];
+    
+//     // Find the corresponding delay pattern from VIDEO_SWITCH_DELAYS
+//     // Subtract 1 because your IDs start at 1 but arrays start at 0
+//     const delayPattern = VIDEO_SWITCH_DELAYS[testID - 1];
+    
+//     if (delayPattern && typeof delayPattern[currentIndex] === 'number') {
+//       return delayPattern[currentIndex];
+//     }
+//   }
+//   return 0; 
+// }
+
+// GIF overlay for simulating delay
+const gifOverlay = document.createElement('div');
+gifOverlay.style.position = 'fixed';
+gifOverlay.style.top = 0;
+gifOverlay.style.left = 0;
+gifOverlay.style.width = '100vw';
+gifOverlay.style.height = '100vh';
+gifOverlay.style.background = '#000';
+gifOverlay.style.zIndex = 99999;
+gifOverlay.style.display = 'none';
+gifOverlay.style.justifyContent = 'center';
+gifOverlay.style.alignItems = 'center';
+gifOverlay.style.display = 'none';
+// Set your GIF path here (e.g., 'loading.gif')
+const gifImg = document.createElement('img');
+gifImg.src = 'output.gif';
+// --- NEW CODE START ---
+// Check if screen width is less than 768px (typical mobile breakpoint)
+if (window.innerWidth < 768) {
+  gifImg.style.maxWidth = '100vw';  // 60% of screen width on Mobile
+  gifImg.style.maxHeight = '100vh';
+} else {
+  gifImg.style.maxWidth = '30vw';  // 30% of screen width on PC
+  gifImg.style.maxHeight = '30vh';
+}
+// --- NEW CODE END ---
+gifImg.style.position = 'absolute';
+gifImg.style.top = '50%';
+gifImg.style.left = '50%';
+gifImg.style.transform = 'translate(-50%, -50%)';
+gifOverlay.appendChild(gifImg);
+document.body.appendChild(gifOverlay);
+    // handleSwipe内で次の動画・前の動画へ切り替える際に遅延を追加
+    function handleSwipe2(deltaY) {
+      if (isTouch) {
+        deltaY = -deltaY;
+      } else if (mouseDown) {
+        deltaY = -deltaY;
+      }
+      if (Math.abs(deltaY) > 5) {
+        const delay = getCurrentDelay();
+        if (deltaY < 0 && currentIndex < shorts.length - 1) {
+          logPlayTime(currentIndex);
+          currentIndex++;
+          // ブラックスクリーン表示→遅延→動画再生
+          if (delay > 0) {
+            blackScreen.style.display = 'block';
+            updateShorts(); // 動画切り替え
+            setTimeout(() => {
+              blackScreen.style.display = 'none';
+              const video = shorts[currentIndex].querySelector('video');
+              if (video) {
+                video.currentTime = 0;
+                video.muted = false;
+                video.play();
+              }
+            }, delay);
+          } else {
+            updateShorts();
+            const video = shorts[currentIndex].querySelector('video');
+            if (video) {
+              video.currentTime = 0;
+              video.muted = false;
+              video.play();
+            }
+          }
+        } else if (deltaY > 0 && currentIndex > 0) {
+          logPlayTime(currentIndex);
+          currentIndex--;
+          if (delay > 0) {
+            blackScreen.style.display = 'block';
+            updateShorts();
+            setTimeout(() => {
+              blackScreen.style.display = 'none';
+              const video = shorts[currentIndex].querySelector('video');
+              if (video) {
+                video.currentTime = 0;
+                video.muted = false;
+                video.play();
+              }
+            }, delay);
+          } else {
+            updateShorts();
+            const video = shorts[currentIndex].querySelector('video');
+            if (video) {
+              video.currentTime = 0;
+              video.muted = false;
+              video.play();
+            }
+          }
+        } else if (deltaY < 0 && currentIndex === shorts.length - 1) {
+          logPlayTime(currentIndex);
+          if (delay > 0) {
+            blackScreen.style.display = 'block';
+            setTimeout(() => {
+              blackScreen.style.display = 'none';
+              showFinishPage();
+            }, delay);
+          } else {
+            showFinishPage();
+          }
+        }
+      }
+    }
+
+
+
+// 再生・評価サイクルをリセットして再スタート
+function restartPlayback() {
+  console.log('Restarting playback...');
+  currentIndex = 0;
+  currentVideoIndex = 0;
+  playTimes = Array(6).fill(0);
+  shortsContainer.style.display = '';
+  finishPage.style.display = 'none';
+  scorePage.style.display = 'none';
+  loadCurrentVideo();
+}
+
+function buildVideoQueue() {
+  const queue = [];
+  const totalRounds = Array.isArray(selected_test_samples) ? selected_test_samples.length : 0;
+
+  for (let round = 0; round < totalRounds; round++) {
+    const roundVideos = PREDEFINED_VIDEO_INDEXES[round % PREDEFINED_VIDEO_INDEXES.length] || [];
+    const resolutions = Array.isArray(selected_test_samples[round]) ? selected_test_samples[round][1] : [];
+
+    roundVideos.forEach((videoId, index) => {
+      const resKey = resolutions[index] || '0';
+      const folder = RES_PATHS[resKey] || RES_PATHS['0'];
+      queue.push({
+        round,
+        slotIndex: index,
+        videoId: Number(videoId) + 1,
+        resolutionKey: resKey,
+        src: `${folder}${Number(videoId) + 1}.mp4`
+      });
+    });
+  }
+
+  return queue;
+}
+
+function loadCurrentVideo() {
+  const totalVideos = videoQueue.length;
+
+  if (!totalVideos) {
+    showFinishPage();
+    return;
+  }
+
+  if (currentVideoIndex >= totalVideos) {
+    showFinishPage();
+    return;
+  }
+
+  shortsContainer.style.display = '';
+  scorePage.style.display = 'none';
+  currentVideoItem = videoQueue[currentVideoIndex];
+  const videoSrc = currentVideoItem.src;
+
+  shortsContainer.innerHTML = `
+    <div class="short" style="transform: translateY(0%);">
+      <video 
+        src="${videoSrc}" 
+        playsinline 
+        preload="auto"
+        autoplay
+        muted
+        style="width:100%;height:100%;background:#000;object-fit:cover;"
+      ></video>
+    </div>
+  `;
+
+  shorts = document.querySelectorAll('.short');
+  currentIndex = 0;
+  updateShorts();
+  playCurrentVideo();
+}
+
+function showFinishPage() {
+  clearTimeout(watchTimer);
+  shortsContainer.style.display = 'none';
+  scorePage.style.display = 'none';
+  finishPage.style.display = 'flex';
+
+  const totalVideos = videoQueue.length || 0;
+  const finishedText = totalVideos
+    ? `You have finished evaluating ${totalVideos} videos.`
+    : 'You have finished watching all videos.';
+  finishPage.querySelector('p').textContent = finishedText;
+}
+
+function updateProgressBar() {
+  const total = Math.max(1, videoQueue.length || EVALUATION_REPEAT || 1);
+  const percent = Math.round(((currentVideoIndex + 1) / total) * 100);
+  document.getElementById('progress-bar').style.width = percent + '%';
+  document.getElementById('progress-text').innerHTML = `${Math.min(currentVideoIndex + 1, total)} / ${total} videos`;
+}
+
+// スコアページ送信処理
+const scorePage = document.getElementById('score-page');
+const scoreForm = document.getElementById('score-form');
+scoreForm.onsubmit = function(e) {
+  e.preventDefault();
+  const acr = scoreForm.elements['acr'].value;
+
+  if (!acr) {
+    alert('Please choose a score before continuing.');
+    return;
+  }
+
+  const item = currentVideoItem || { videoId: currentVideoIndex + 1, resolutionKey: '0' };
+  logAndBuffer(`Video ${item.videoId} (resolution=${item.resolutionKey}) score:`, acr);
+
+  currentVideoIndex++;
+  evaluationCount = currentVideoIndex;
+  scoreForm.reset();
+
+  if (currentVideoIndex < videoQueue.length) {
+    scorePage.style.display = 'none';
+    shortsContainer.style.display = '';
+    updateProgressBar();
+    loadCurrentVideo();
+    return;
+  }
+
+  scorePage.style.display = 'none';
+  finishPage.style.display = 'flex';
+  scorePage.querySelector('h1').textContent = 'Video Quality Evaluation';
+};
+
+    downloadLogBtnFinish.onclick = function() {
+  const safeName = userName.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  // 現在日時をYYYYMMDD_HHMMSS形式で取得
+  const now = new Date();
+  const pad = n => n.toString().padStart(2, '0');
+  const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const blob = new Blob([logBuffer.join('\n')], {type: 'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  // phong modify
+  if(test_id_list.length < TEST_SAMPLE.length) {
+    a.download = `log_quality_test2_re_${safeName}_${dateStr}.txt`;
+  } else {
+    a.download = `log_quality_test2_${safeName}_${dateStr}.txt`;
+  }
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// Usage:
+//shuffleRowsInSync(PREDEFINED_VIDEO_INDEXES, VIDEO_SWITCH_DELAYS);
+// function loadVideoIndexesFromCSV(csvUrl, callback) {
+//   fetch(csvUrl)
+//     .then(response => response.text())
+//     .then(text => {
+//       PREDEFINED_VIDEO_INDEXES = text.trim().split('\n').map(row =>
+//         row.split(',').map(cell => Number(cell.trim()))
+//       );
+//       console.log('Loaded video indexes:', PREDEFINED_VIDEO_INDEXES.length, PREDEFINED_VIDEO_INDEXES[0]);
+//       if (callback) callback();
+//     })
+//     .catch(err => {
+//       console.error('Failed to load video index CSV:', err);
+//       PREDEFINED_VIDEO_INDEXES = [];
+//       if (callback) callback();
+//     });
+// }
+
+// --- 評価ごとに事前定義リストから動画を取得 ---
+// phong modify
+// function getPredefinedVideos(round) {
+//   console.log('Getting predefined videos for round:', round,PREDEFINED_VIDEO_INDEXES.length);
+//   const indexes = PREDEFINED_VIDEO_INDEXES[round % PREDEFINED_VIDEO_INDEXES.length];
+//   console.log('Using video indexes:', indexes);
+//   return indexes.map(i => videoList[i]);
+// }
+function getPredefinedVideos(round) {
+  // 1. Get the list of Video IDs for this round (e.g., 91, 112, 115...)
+  const indexes = PREDEFINED_VIDEO_INDEXES[round % PREDEFINED_VIDEO_INDEXES.length];
+  
+  // 2. Get the list of Resolutions for this round (e.g., "720p", "360p"...)
+  // We use safe access (?) just in case the round data is missing
+  const resolutions = selected_test_samples[round] ? selected_test_samples[round][1] : [];
+
+  // 3. Generate the file paths
+  return indexes.map((vidIndex, i) => {
+    // Get resolution for this specific video (default to '720p' if missing)
+    const resKey = resolutions[i] || "720p"; 
+    
+    // Look up the folder path (e.g., "./video_resolution/720p/")
+    const folderPath = RES_PATHS[resKey];
+
+    return { 
+      title: `Video ${vidIndex+1}`, 
+      // Construct the full path: ./video_resolution/720p/91.mp4
+      src: `${folderPath}${vidIndex+1}.mp4` 
+    };
+  });
+}
+
+// 起動時にCSVから読み込む（例: video_id_lists.csv）
+// loadVideoIndexesFromCSV('video_id_lists.csv');
+
+// --- Dynamically create shorts video elements ---
+//let selectedVideos = getPredefinedVideos(evaluationCount);
+//console.log('Selected videos for evaluation:', selectedVideos);
+//shortsContainer.innerHTML = selectedVideos.map((video, idx) => `
+//  <div class="short" style="transform: translateY(${idx * 100}%);">
+//    <video 
+//      src="${video.src}" 
+//      controls 
+//      playsinline 
+//      preload="auto"
+//      autoplay
+//      muted
+//      style="width:100%;height:100%;background:#000;object-fit:cover;"
+//    ></video>
+//    <div style="position:absolute;bottom:16px;left:16px;color:#fff;font-size:1.2rem;text-shadow:0 0 8px #000;">${video.title}</div>
+//  </div>
+//`).join('');
+
+var shorts = document.querySelectorAll('.short');
+let currentIndex = 0;
+let startY = 0;
+let isTouch = false;
+
+// --- Play time tracking ---
+var playTimes = Array(shorts.length).fill(0); // ms
+let playStart = Date.now();
+
+function logPlayTime(index) {
+  const now = Date.now();
+  playTimes[index] += now - playStart;
+  // If this is the last video in the round, force play time to 1000ms
+  const isLastVideo = (index === playTimes.length - 1);
+  let playTimeToLog = playTimes[index];
+  // if (isLastVideo) {
+  //   playTimeToLog = 1000;
+  //   playTimes[index] = 1000;
+  // }
+  logAndBuffer(
+    `Video ${index} (${PREDEFINED_VIDEO_INDEXES[evaluationCount][index]}) play time: ${playTimeToLog / 1000}s`
+  );
+  playStart = now;
+}
+
+// --- Touch events (mobile & touchpad) ---
+document.addEventListener('touchstart', (e) => {
+  // スタートページ・スコアページ・フィニッシュページが表示中は何もしない
+  if (
+    startPage.style.display !== "none" ||
+    scorePage.style.display !== "none" ||
+    finishPage.style.display !== "none"
+  ) return;
+  console.log('Touch start detected:', e.touches[0].clientY);
+  logAndBuffer('Touch start detected');
+  isTouch = true;
+  startY = e.touches[0].clientY;
+});
+
+document.addEventListener('touchend', (e) => {
+  if (
+    startPage.style.display !== "none" ||
+    scorePage.style.display !== "none" ||
+    finishPage.style.display !== "none"
+  ) return;
+  console.log('Touch end detected:', e.changedTouches[0].clientY);
+  if (!isTouch) return;
+  const endY = e.changedTouches[0].clientY;
+  if(endY - startY > 0) {
+    handleSwipe(-100);
+    logAndBuffer('Swipe down detected');
+  } else {
+    handleSwipe(100);
+    logAndBuffer('Swipe up detected');
+  }
+});
+
+// Mouse events (touchpad swipe)
+let mouseDown = false;
+let mouseStartY = 0;
+document.addEventListener('mousedown', (e) => {
+  if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
+  isTouch = false;
+  mouseDown = true;
+  mouseStartY = e.clientY;
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
+  if (!mouseDown) return;
+  mouseDown = false;
+  const deltaY = e.clientY - mouseStartY;
+  handleSwipe(deltaY);
+});
+
+    
+    // Wheel event (for mouse scroll/touchpad swipe)
+    let wheelLocked = false;
+    document.addEventListener('wheel', function(e) {
+      if (finishPage.style.display !== "none") return;
+      // スタートページ表示中は何もしない（動画切り替えせず、スクロールは許可）
+      if (startPage.style.display !== "none") return;
+      console.log('Wheel event detected:', e.deltaY);
+      if (isTouch) return;
+      if (mouseDown) return;
+      if (wheelLocked) return;
+      if(e.deltaY < -20) {
+        handleSwipe(100);
+        wheelLocked = true;
+        setTimeout(() => { wheelLocked = false; }, 400);
+        e.preventDefault();
+      } else if(e.deltaY > 20) {
+        handleSwipe(-100);
+        wheelLocked = true;
+        setTimeout(() => { wheelLocked = false; }, 400);
+        e.preventDefault();
+      }
+    }, { passive: false });
+    // --- VR Controller / Gamepad input ---
+  const gamepadState = {
+    pressed: new Set()
+  };
+
+  function triggerVideoAction(direction) {
+    if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
+
+    if (scorePage.style.display !== "none") {
+      if (direction === "next" || direction === "prev") {
+        if (!scoreForm.elements['acr'].value) {
+          alert('Please choose a score before continuing.');
+          return;
+        }
+        scoreForm.requestSubmit();
+      }
+      return;
+    }
+  }
+
+  function pollGamepads() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const pad of pads) {
+      if (!pad) continue;
+
+      // Right controller mapping:
+      // 0 = A, 1 = B, 2 = X, 3 = Y
+      const A = pad.buttons[0];
+      const B = pad.buttons[1];
+      const X = pad.buttons[2];
+      const Y = pad.buttons[3];
+
+      if (A && A.pressed && !gamepadState.pressed.has(`${pad.index}-A`)) {
+        triggerVideoAction("next");
+        gamepadState.pressed.add(`${pad.index}-A`);
+      } else if (!A || !A.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-A`);
+      }
+
+      if (B && B.pressed && !gamepadState.pressed.has(`${pad.index}-B`)) {
+        triggerVideoAction("prev");
+        gamepadState.pressed.add(`${pad.index}-B`);
+      } else if (!B || !B.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-B`);
+      }
+
+      // Optional left controller support
+      if (X && X.pressed && !gamepadState.pressed.has(`${pad.index}-X`)) {
+        triggerVideoAction("next");
+        gamepadState.pressed.add(`${pad.index}-X`);
+      } else if (!X || !X.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-X`);
+      }
+
+      if (Y && Y.pressed && !gamepadState.pressed.has(`${pad.index}-Y`)) {
+        triggerVideoAction("prev");
+        gamepadState.pressed.add(`${pad.index}-Y`);
+      } else if (!Y || !Y.pressed) {
+        gamepadState.pressed.delete(`${pad.index}-Y`);
+      }
+    }
+
+    requestAnimationFrame(pollGamepads);
+  }
+  requestAnimationFrame(pollGamepads);
+    // Keyboard events for next evaluation after rating
+    document.addEventListener('keydown', (e) => {
+      if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
+      if (scorePage.style.display === 'none') return;
+
+      const key = e.key.toLowerCase();
+      if (key === 'arrowdown' || key === 'a' || key === 'b') {
+        if (!scoreForm.elements['acr'].value) {
+          alert('Please choose a score before continuing.');
+          return;
+        }
+        scoreForm.requestSubmit();
+      }
+    });
+
+    const swipePopup = document.getElementById('swipe-popup');
+    if (swipePopup) {
+      swipePopup.style.display = 'none';
+    }
+
+    function updateShorts() {
+      // If Start or Finish page is visible, pause everything
+      if (
+        startPage.style.display !== "none" ||
+        finishPage.style.display !== "none"
+      ) {
+        shorts.forEach((short, index) => {
+          const video = short.querySelector('video');
+          if (!video.paused) video.pause();
+          video.currentTime = 0;
+          video.onclick = null;
+        });
+        // Always hide popup if start or finish page is visible
+        clearTimeout(window._swipePopupTimeout);
+        document.getElementById('swipe-popup').style.display = 'none';
+        return;
+      }
+
+      shorts.forEach((short, index) => {
+        short.style.transform = `translateY(${(index - currentIndex) * 100}%)`;
+        const video = short.querySelector('video');
+        if (index === currentIndex) {
+          video.currentTime = 0;
+          // STRICT MUTE: Always true
+          video.muted = true; 
+        } else {
+          video.pause();
+          video.currentTime = 0;
+          video.onclick = null;
+        }
+      });
+      playStart = Date.now();
+    }
+
+    // --- スマホで自動再生するためのイベントフック ---
+    // Phong modify
+// function playCurrentVideo() {
+//   const video = shorts[currentIndex]?.querySelector('video');
+//   // Get playback time for this round
+//   let roundViewTime = Array.isArray(VIEW_TIME_MS) ? selected_test_samples[evaluationCount][2] : undefined;
+//   if (video) {
+//     //video.muted = false;
+//     video.play().catch(() => {});
+//     // Only show popup if not on start/finish/score page
+//     if (
+//       startPage.style.display === "none" &&
+//       finishPage.style.display === "none" &&
+//       (typeof scorePage === 'undefined' || scorePage.style.display === "none")
+//     ) {
+//       clearTimeout(window._swipePopupTimeout);
+//       document.getElementById('swipe-popup').style.display = 'none';
+//       // Lock swipe until popup appears
+//       swipeLocked = true;
+//       // If this is the last video in the round, auto-advance after 1000ms but do NOT show popup
+//       if (currentIndex === shorts.length - 1) {
+//         clearTimeout(window._videoPlaybackTimeout);
+//         window._videoPlaybackTimeout = setTimeout(() => {
+//           logPlayTime(currentIndex);
+//           showFinishPage();
+//         }, 1000);
+//         // Do not unlock swipe for last video
+//       } else if (typeof roundViewTime === 'number' && !isNaN(roundViewTime)) {
+//         window._swipePopupTimeout = setTimeout(() => {
+//           document.getElementById('swipe-popup').style.display = 'flex';
+//           swipeLocked = false;
+//         }, roundViewTime);
+//       }
+//     }
+//     // Remove any previous auto-advance timeout (already handled above)
+//   }
+// }
+// Updated function: Accepts a parameter to skip forced muting
+function playCurrentVideo() {
+  const video = shorts[0]?.querySelector('video');
+  if (!video) return;
+
+  clearTimeout(watchTimer);
+  video.muted = true;
+  video.currentTime = 0;
+
+  const playPromise = video.play();
+  if (playPromise && typeof playPromise.then === 'function') {
+    playPromise
+      .then(() => {
+        video.muted = true;
+      })
+      .catch(() => {
+        video.muted = true;
+        video.play().catch(() => {});
+      });
+  }
+
+  if (
+    startPage.style.display === 'none' &&
+    finishPage.style.display === 'none' &&
+    scorePage.style.display === 'none'
+  ) {
+    watchTimer = setTimeout(() => {
+      const videoNode = shorts[0]?.querySelector('video');
+      try { videoNode?.pause(); } catch (e) {}
+      showScorePageForCurrentVideo();
+    }, VIDEO_WATCH_MS);
+  }
+}
+
+function showScorePageForCurrentVideo() {
+  shortsContainer.style.display = 'none';
+  scorePage.style.display = 'flex';
+  const total = Math.max(1, videoQueue.length);
+  const percent = Math.round(((currentVideoIndex + 1) / total) * 100);
+
+  scorePage.querySelector('h1').innerHTML = `Video Quality Evaluation (${currentVideoIndex + 1}/${total})`;
+  document.getElementById('progress-bar').style.width = `${percent}%`;
+  document.getElementById('progress-text').innerHTML = `${currentVideoIndex + 1} / ${total} videos`;
+  document.getElementById('next-btn').disabled = false;
+  document.getElementById('next-btn').style.opacity = '1';
+}
+
+function handleSwipe(deltaY) {
+  // Không dùng swipe ở flow mới. Mỗi video chỉ được đánh giá sau 10s.
+  return;
+}
+// --- WebXR native controller input for Quest ---
+function triggerVideoAction(direction) {
+  if (startPage.style.display !== "none" || finishPage.style.display !== "none") return;
+
+  if (direction === "next") {
+    handleSwipe(-100);   // next video
+  } else if (direction === "prev") {
+    handleSwipe(100);    // previous video
+  }
+}
+
+function bindXRControllerInput() {
+  if (!("xr" in navigator)) {
+    console.warn("WebXR is not supported in this browser.");
+    return;
+  }
+
+  // Try to start an immersive VR session
+  navigator.xr.requestSession("immersive-vr", {
+    requiredFeatures: ["local-floor"],
+    optionalFeatures: ["hand-tracking"]
+  })
+  .then((session) => {
+    console.log("WebXR VR session started");
+
+    // Trigger / primary action from controller
+    session.addEventListener("selectstart", (event) => {
+      const source = event.inputSource;
+      const gamepad = source?.gamepad;
+
+      if (!gamepad) return;
+
+      // Some controllers expose button layout:
+      // 0 = A / trigger-like primary button
+      // 1 = B / secondary button
+      // 2 = X
+      // 3 = Y
+      const primary = gamepad.buttons[0];
+      const secondary = gamepad.buttons[1];
+      const xButton = gamepad.buttons[2];
+      const yButton = gamepad.buttons[3];
+
+      if (primary && primary.pressed) {
+        triggerVideoAction("next");
+      }
+      if (secondary && secondary.pressed) {
+        triggerVideoAction("prev");
+      }
+      if (xButton && xButton.pressed) {
+        triggerVideoAction("next");
+      }
+      if (yButton && yButton.pressed) {
+        triggerVideoAction("prev");
+      }
+    });
+
+    // Optional: allow on select as well
+    session.addEventListener("select", (event) => {
+      const source = event.inputSource;
+      const gamepad = source?.gamepad;
+
+      if (!gamepad) return;
+
+      const primary = gamepad.buttons[0];
+      const secondary = gamepad.buttons[1];
+      const xButton = gamepad.buttons[2];
+      const yButton = gamepad.buttons[3];
+
+      if (primary && primary.pressed) {
+        triggerVideoAction("next");
+      }
+      if (secondary && secondary.pressed) {
+        triggerVideoAction("prev");
+      }
+      if (xButton && xButton.pressed) {
+        triggerVideoAction("next");
+      }
+      if (yButton && yButton.pressed) {
+        triggerVideoAction("prev");
+      }
+    });
+
+    window.__xrSession = session;
+
+    // If you also want to keep browser fallback for desktop:
+    // keep the existing ArrowDown/ArrowUp keyboard support.
+  })
+  .catch((err) => {
+    console.warn("WebXR session failed:", err);
+  });
+}
+
+// call it once after page setup
+bindXRControllerInput();
+// Log play time when user leaves the page or finish page is shown
+window.addEventListener('beforeunload', () => {
+  logPlayTime(currentIndex);
+  playTimes.forEach((t, i) => {
+    logAndBuffer(`Final Video ${i} play time: ${t / 1000}s`);
+  });
+});
+
+finishPage.addEventListener('show', () => {
+  logPlayTime(currentIndex);
+  playTimes.forEach((t, i) => {
+    logAndBuffer(`Final Video ${i} play time: ${t / 1000}s`);
+  });
+});
+  </script>
+</body>
+</html>
+
+
